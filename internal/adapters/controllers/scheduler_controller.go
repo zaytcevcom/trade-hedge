@@ -46,6 +46,8 @@ func (s *SchedulerController) Start(ctx context.Context) {
 
 // executeStrategy выполняет одну итерацию стратегии
 func (s *SchedulerController) executeStrategy(ctx context.Context) {
+	// Добавляем отступ для лучшей читаемости логов
+	logger.LogPlain("\n")
 	logger.LogWithTime("⏰ Проверка позиций...")
 
 	// 1. Сначала проверяем статусы существующих хеджированных ордеров
