@@ -1,0 +1,296 @@
+{{define "dashboard-content"}}
+<div x-data="dashboard()" x-init="init()">
+    <!-- Заголовок -->
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900">Дашборд хеджирования</h2>
+        <p class="text-gray-600 mt-2">Мониторинг активных позиций и статистика</p>
+    </div>
+
+    <!-- Статистические карточки -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Всего сделок -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-chart-bar text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Всего хеджированных</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.total">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Активные ордера -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-clock text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Активные ордера</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.active">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Закрытые ордера -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-check-circle text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Закрытые ордера</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.completed">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Общая прибыль -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                    <i class="fas fa-dollar-sign text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Общая прибыль</p>
+                    <p class="text-2xl font-semibold" 
+                       :class="stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'"
+                       x-text="formatCurrency(stats.totalProfit)">
+                        $0.00
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Быстрые действия -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-play-circle mr-2 text-blue-600"></i>Быстрые действия
+            </h3>
+            <div class="space-y-3">
+                <button @click="executeStrategy()" 
+                        :disabled="loading"
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    <i class="fas fa-rocket mr-2"></i>
+                    <span x-show="!loading">Выполнить хеджирование</span>
+                    <span x-show="loading">Выполняется...</span>
+                </button>
+                
+                <button @click="checkStatuses()" 
+                        :disabled="loading"
+                        class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    <span x-show="!loading">Проверить статусы ордеров</span>
+                    <span x-show="loading">Проверяется...</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Статус системы -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-heartbeat mr-2 text-green-600"></i>Статус системы
+            </h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">База данных</span>
+                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                        <i class="fas fa-circle mr-1"></i>Подключена
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">Последняя проверка</span>
+                    <span class="text-sm text-gray-500" x-text="formatTime(lastCheck)">—</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">Автопроверка</span>
+                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                        <i class="fas fa-circle mr-1"></i>Активна
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Последние сделки -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-history mr-2 text-gray-600"></i>Последние хеджированные сделки
+            </h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Время
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Пара
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Статус
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Прибыль
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="trade in recentTrades" :key="trade.bybit_order_id">
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" 
+                                x-text="formatTime(trade.hedge_time)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" 
+                                x-text="trade.pair"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                      :class="getStatusClass(trade.order_status)"
+                                      x-text="getStatusText(trade.order_status)"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm"
+                                :class="trade.profit >= 0 ? 'text-green-600' : 'text-red-600'"
+                                x-text="formatCurrency(trade.profit)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div x-show="notification" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-2"
+         class="fixed top-4 right-4 p-4 rounded-md shadow-lg z-50"
+         :class="notificationType === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'">
+        <p x-text="notification"></p>
+    </div>
+</div>
+
+<script>
+function dashboard() {
+    return {
+        stats: {
+            total: 0,
+            active: 0,
+            completed: 0,
+            totalProfit: 0
+        },
+        recentTrades: [],
+        loading: false,
+        notification: '',
+        notificationType: 'success',
+        lastCheck: null,
+
+        init() {
+            this.loadData();
+            // Автообновление каждые 30 секунд
+            setInterval(() => this.loadData(), 30000);
+        },
+
+        async loadData() {
+            try {
+                const response = await fetch('/api/trades');
+                const data = await response.json();
+                
+                this.recentTrades = data.trades || [];
+                this.stats = data.stats || this.stats;
+                this.lastCheck = new Date();
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+            }
+        },
+
+        async executeStrategy() {
+            this.loading = true;
+            try {
+                const response = await fetch('/api/execute', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.showNotification('Хеджирование выполнено успешно!', 'success');
+                    this.loadData();
+                } else {
+                    this.showNotification(result.message || 'Ошибка выполнения', 'error');
+                }
+            } catch (error) {
+                this.showNotification('Ошибка выполнения: ' + error.message, 'error');
+            }
+            this.loading = false;
+        },
+
+        async checkStatuses() {
+            this.loading = true;
+            try {
+                const response = await fetch('/api/check-status', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.showNotification(`Статусы обновлены: ${result.updated} ордеров`, 'success');
+                    this.loadData();
+                } else {
+                    this.showNotification(result.message || 'Ошибка проверки', 'error');
+                }
+            } catch (error) {
+                this.showNotification('Ошибка проверки: ' + error.message, 'error');
+            }
+            this.loading = false;
+        },
+
+        showNotification(message, type = 'success') {
+            this.notification = message;
+            this.notificationType = type;
+            setTimeout(() => {
+                this.notification = '';
+            }, 5000);
+        },
+
+        formatCurrency(amount) {
+            if (amount === null || amount === undefined) return '—';
+            return '$' + amount.toFixed(4);
+        },
+
+        formatTime(dateStr) {
+            if (!dateStr) return '—';
+            return new Date(dateStr).toLocaleString('ru-RU');
+        },
+
+        getStatusClass(status) {
+            switch (status) {
+                case 'FILLED':
+                    return 'bg-green-100 text-green-800';
+                case 'PENDING':
+                    return 'bg-yellow-100 text-yellow-800';
+                case 'CANCELLED':
+                case 'REJECTED':
+                    return 'bg-red-100 text-red-800';
+                default:
+                    return 'bg-gray-100 text-gray-800';
+            }
+        },
+
+        getStatusText(status) {
+            const statusTexts = {
+                'FILLED': 'Исполнен',
+                'PENDING': 'Ожидает',
+                'CANCELLED': 'Отменен',
+                'REJECTED': 'Отклонен',
+                'UNKNOWN': 'Неизвестно'
+            };
+            return statusTexts[status] || 'Неизвестно';
+        }
+    }
+}
+</script>
+{{end}}

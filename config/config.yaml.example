@@ -1,0 +1,34 @@
+# Пример конфигурационного файла для trade-hedge
+# Скопируйте этот файл в config.yaml и заполните своими данными
+
+freqtrade:
+  api_url: "http://localhost:8080/api/v1/status"
+  username: "your_username"
+  password: "your_password"
+
+bybit:
+  api_key: "your_bybit_api_key"
+  api_secret: "your_bybit_api_secret"
+  spot_url: "https://api.bybit.com/v5/order/create"
+  balance_url: "https://api.bybit.com/v5/account/wallet-balance"
+  order_status_url: "https://api.bybit.com/v5/order/realtime"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "your_db_password"
+  dbname: "trade_hedge"
+  sslmode: "disable"
+
+strategy:
+  position_amount: 100.0   # Фиксированная сумма позиции в базовой валюте (USDT)
+  max_loss_percent: 3.0    # Максимальный процент убытка для хеджирования
+  profit_ratio: 0.8        # Коэффициент прибыли относительно убытка
+  base_currency: "USDT"    # Базовая валюта для покупки
+  check_interval: 300      # Интервал проверки в секундах (0 = одноразовое выполнение)
+
+webui:
+  enabled: true            # Включить веб-интерфейс
+  host: "localhost"        # Хост для веб-сервера
+  port: 8081              # Порт для веб-сервера

@@ -1,0 +1,60 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Configuration files (содержат секреты)
+config/config.yaml
+.env
+.env.local
+.env.*.local
+deploy/local/.env
+deploy/prod/.env
+
+# Build artifacts
+trade-hedge
+/trade-hedge
+cmd/trade-hedge/trade-hedge
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker data
+docker-data/
+
+# Backup files
+backup_*.sql
+
+# Temporary files
+*.tmp
+*.temp
