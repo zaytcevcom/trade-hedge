@@ -31,9 +31,9 @@ func (r *HedgeRepositoryAdapter) SaveHedgedTrade(ctx context.Context, hedgedTrad
 	return r.dbRepo.SaveHedgedTrade(ctx, hedgedTrade)
 }
 
-// GetActiveHedgedTrades получает все активные хеджированные сделки
-func (r *HedgeRepositoryAdapter) GetActiveHedgedTrades(ctx context.Context) ([]*entities.HedgedTrade, error) {
-	return r.dbRepo.GetActiveHedgedTrades(ctx)
+// GetHedgedTrades получает хеджированные сделки по статусу
+func (r *HedgeRepositoryAdapter) GetHedgedTrades(ctx context.Context, status *string) ([]*entities.HedgedTrade, error) {
+	return r.dbRepo.GetHedgedTrades(ctx, status)
 }
 
 // UpdateHedgedTradeStatus обновляет статус хеджированной сделки

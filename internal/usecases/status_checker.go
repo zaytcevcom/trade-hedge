@@ -33,7 +33,8 @@ func (s *StatusCheckerUseCase) CheckAllActiveOrders(ctx context.Context) error {
 	logger.LogWithTime("🔍 Начинаем проверку статусов активных хеджированных ордеров...")
 
 	// 1. Получаем все активные хеджированные сделки
-	activeTrades, err := s.hedgeRepo.GetActiveHedgedTrades(ctx)
+	pendingStatus := "PENDING"
+	activeTrades, err := s.hedgeRepo.GetHedgedTrades(ctx, &pendingStatus)
 	if err != nil {
 		return fmt.Errorf("ошибка получения активных хеджированных сделок: %w", err)
 	}

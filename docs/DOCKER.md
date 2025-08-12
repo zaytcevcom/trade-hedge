@@ -35,7 +35,7 @@ docker compose logs -f trade-hedge
 
 - **Веб-интерфейс**: http://localhost:8081
 - **База данных**: localhost:5432 (логин: postgres)
-- **Adminer** (с профилем tools): http://localhost:8080
+
 
 ## 📋 Профили запуска
 
@@ -45,11 +45,7 @@ docker compose up -d
 ```
 Включает: приложение + PostgreSQL
 
-### С инструментами разработки
-```bash
-docker compose --profile tools up -d
-```
-Добавляет: Adminer для управления БД
+
 
 ## ⚙️ Конфигурация
 
@@ -59,7 +55,7 @@ docker compose --profile tools up -d
 
 ```bash
 # Freqtrade API
-FREQTRADE_API_URL=http://your-freqtrade:8080/api/v1/trades
+FREQTRADE_API_URL=http://your-freqtrade:8080/api/v1/status
 FREQTRADE_USERNAME=your_username
 FREQTRADE_PASSWORD=your_password
 
@@ -161,7 +157,6 @@ trade-hedge/
 |--------|------------|---------|----------|
 | trade-hedge | 8081 | 8081 | Веб-интерфейс |
 | postgres | 5432 | 5432 | База данных |
-| adminer | 8080 | 8080 | Управление БД |
 
 ## 🔍 Мониторинг
 

@@ -106,7 +106,7 @@ func (b *BybitClient) PlaceOrder(ctx context.Context, order *entities.Order) (*e
 
 	// Для лимитных ордеров добавляем цену
 	if order.Type == entities.OrderTypeLimit {
-		params["price"] = strconv.FormatFloat(order.Price, 'f', 6, 64)
+		params["price"] = strconv.FormatFloat(order.Price, 'f', 4, 64)
 	}
 
 	paramStr, err := json.Marshal(params)
@@ -147,6 +147,14 @@ func (b *BybitClient) PlaceOrder(ctx context.Context, order *entities.Order) (*e
 	// Проверка на ошибку
 	var errResp BybitErrorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.RetCode != 0 {
+		// Специальная обработка для ошибки минимального лимита ордера
+		if errResp.RetCode == 170140 {
+			return &entities.OrderResult{
+				Success: false,
+				Error:   fmt.Sprintf("ошибка Bybit: %s (код: %d) - Стоимость ордера меньше минимального лимита. Увеличьте размер позиции в конфигурации.", errResp.RetMsg, errResp.RetCode),
+			}, nil
+		}
+
 		return &entities.OrderResult{
 			Success: false,
 			Error:   fmt.Sprintf("ошибка Bybit: %s (код: %d)", errResp.RetMsg, errResp.RetCode),

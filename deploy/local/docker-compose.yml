@@ -56,9 +56,11 @@ services:
       # Strategy
       STRATEGY_POSITION_AMOUNT: ${STRATEGY_POSITION_AMOUNT:-100.0}
       STRATEGY_MAX_LOSS_PERCENT: ${STRATEGY_MAX_LOSS_PERCENT:-3.0}
-      STRATEGY_PROFIT_RATIO: ${STRATEGY_PROFIT_RATIO:-1.5}
+      STRATEGY_PROFIT_RATIO: ${STRATEGY_PROFIT_RATIO:-0.8}
       STRATEGY_BASE_CURRENCY: ${STRATEGY_BASE_CURRENCY:-USDT}
       STRATEGY_CHECK_INTERVAL: ${STRATEGY_CHECK_INTERVAL:-300}
+      STRATEGY_RETRY_ATTEMPTS: ${STRATEGY_RETRY_ATTEMPTS:-3}
+      STRATEGY_RETRY_DELAY: ${STRATEGY_RETRY_DELAY:-2}
 
       # Web UI
       WEBUI_ENABLED: ${WEBUI_ENABLED:-true}
@@ -76,24 +78,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Adminer для управления базой данных (опционально)
-  adminer:
-    image: adminer:4.8.1
-    container_name: trade-hedge-adminer
-    restart: unless-stopped
-    depends_on:
-      - postgres
-    ports:
-      - "8080:8080"
-    networks:
-      - trade-hedge-network
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: pepa-linha-dark
-    profiles:
-      - tools
-
 
 
 volumes:

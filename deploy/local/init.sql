@@ -13,9 +13,7 @@ SET timezone = 'UTC';
 -- Примечание: Таблицы будут созданы автоматически приложением
 -- при первом запуске через методы в internal/infrastructure/database/postgresql.go
 
--- Можно добавить дополнительные настройки производительности
-ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';
-ALTER SYSTEM SET pg_stat_statements.track = 'all';
+-- Базовые настройки производительности
 ALTER SYSTEM SET log_statement = 'all';
 ALTER SYSTEM SET log_min_duration_statement = 1000;
 

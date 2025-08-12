@@ -3,7 +3,7 @@
     <!-- Заголовок -->
     <div class="mb-8">
         <h2 class="text-3xl font-bold text-gray-900">Хеджированные сделки</h2>
-        <p class="text-gray-600 mt-2">Детальная история всех хеджированных позиций</p>
+        <p class="text-gray-600 mt-2">Показываются все сделки. Используйте фильтры для ограничения результатов.</p>
     </div>
 
     <!-- Фильтры -->
@@ -14,7 +14,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Статус</label>
                 <select x-model="filters.status" @change="applyFilters()" 
                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Все</option>
+                    <option value="">Все сделки</option>
                     <option value="PENDING">Ожидает</option>
                     <option value="FILLED">Исполнен</option>
                     <option value="CANCELLED">Отменен</option>
@@ -66,19 +66,34 @@
                             Пара
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Статус
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Время хеджирования
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Цена Freqtrade
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Хедж (цена/кол-во)
+                            Хедж (покупка)
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Статус
+                            План (продажа)
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Прибыль
+                            Факт (продажа)
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Кол-во
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Прибыль (план)
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Прибыль (факт)
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Время закрытия
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Действия
@@ -95,27 +110,6 @@
                                 <i class="fas fa-coins mr-1 text-yellow-500"></i>
                                 <span x-text="trade.pair"></span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <div x-text="formatTime(trade.hedge_time)"></div>
-                                <div class="text-xs text-gray-500" x-text="formatTimeAgo(trade.hedge_time)"></div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <div>$<span x-text="trade.freqtrade_open_price.toFixed(4)"></span></div>
-                                <div class="text-xs text-gray-500">
-                                    <span x-text="trade.freqtrade_amount.toFixed(6)"></span> 
-                                    <span x-text="trade.pair.split('/')[0]"></span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <div>$<span x-text="trade.hedge_open_price.toFixed(4)"></span></div>
-                                <div class="text-xs text-gray-500">
-                                    <span x-text="trade.hedge_amount.toFixed(6)"></span> 
-                                    <span x-text="trade.pair.split('/')[0]"></span>
-                                </div>
-                                <div class="text-xs text-gray-500" x-show="trade.close_price">
-                                    Закрыто: $<span x-text="trade.close_price?.toFixed(4)"></span>
-                                </div>
-                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full"
                                       :class="getStatusClass(trade.order_status)">
@@ -126,15 +120,91 @@
                                     Закрыто: <span x-text="formatTime(trade.close_time)"></span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <template x-if="trade.close_price">
-                                    <div :class="getProfit(trade) >= 0 ? 'text-green-600' : 'text-red-600'">
-                                        <i :class="getProfit(trade) >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'" class="mr-1"></i>
-                                        $<span x-text="Math.abs(getProfit(trade)).toFixed(4)"></span>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div x-text="formatTime(trade.hedge_time)"></div>
+                                <div class="text-xs text-gray-500" x-text="formatTimeAgo(trade.hedge_time)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div>
+                                    $<span x-text="trade.freqtrade_open_price.toFixed(6)"></span>
+                                    <span class="ml-2 text-red-600 font-medium" x-text="'(-' + getDrawdownPercent(trade).toFixed(2) + '%)'"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <span x-text="trade.freqtrade_amount.toFixed(6)"></span> 
+                                    <span x-text="trade.pair.split('/')[0]"></span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="font-medium text-green-600">
+                                    $<span x-text="trade.hedge_open_price.toFixed(6)"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">Цена покупки</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="font-medium text-orange-600">
+                                    $<span x-text="trade.hedge_take_profit_price.toFixed(6)"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">Лимитный ордер</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <template x-if="trade.order_status === 'FILLED' && trade.close_price">
+                                    <div class="font-medium text-red-600">
+                                        $<span x-text="trade.close_price.toFixed(6)"></span>
                                     </div>
                                 </template>
-                                <template x-if="!trade.close_price">
-                                    <span class="text-gray-400">—</span>
+                                <template x-if="trade.order_status !== 'FILLED' || !trade.close_price">
+                                    <div class="text-gray-400">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Ожидает
+                                    </div>
+                                </template>
+                                <div class="text-xs text-gray-500">Цена продажи</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="font-medium">
+                                    <span x-text="trade.hedge_amount.toFixed(6)"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <span x-text="trade.pair.split('/')[0]"></span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div :class="getPlannedProfit(trade) >= 0 ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="getPlannedProfit(trade) >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'" class="mr-1"></i>
+                                    $<span x-text="Math.abs(getPlannedProfit(trade)).toFixed(6)"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <span x-text="getPlannedProfitPercent(trade).toFixed(2)"></span>%
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <template x-if="trade.order_status === 'FILLED' && trade.close_price">
+                                    <div>
+                                        <div :class="getActualProfit(trade) >= 0 ? 'text-green-600' : 'text-red-600'">
+                                            <i :class="getActualProfit(trade) >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'" class="mr-1"></i>
+                                            $<span x-text="Math.abs(getActualProfit(trade)).toFixed(6)"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            <span x-text="getActualProfitPercent(trade).toFixed(2)"></span>%
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="trade.order_status !== 'FILLED' || !trade.close_price">
+                                    <div class="text-gray-400">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Ожидает
+                                    </div>
+                                </template>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <template x-if="trade.close_time">
+                                    <div>
+                                        <div x-text="formatTime(trade.close_time)"></div>
+                                        <div class="text-xs text-gray-500" x-text="formatTimeAgo(trade.close_time)"></div>
+                                    </div>
+                                </template>
+                                <template x-if="!trade.close_time">
+                                    <div class="text-gray-400">—</div>
                                 </template>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -221,12 +291,28 @@ function tradesPage() {
 
         async loadTrades() {
             try {
-                const response = await fetch('/api/trades?detailed=true');
+                // Формируем URL с фильтрами
+                let url = '/api/trades';
+                if (this.filters.status) {
+                    url += `?status=${this.filters.status}`;
+                }
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 this.allTrades = data.trades || [];
                 this.extractAvailablePairs();
-                this.applyFilters();
+                
+                // Инициализируем filteredTrades при загрузке
+                if (this.filters.status) {
+                    // Если есть фильтр по статусу, применяем его
+                    this.applyFilters();
+                } else {
+                    // Если нет фильтра, показываем все сделки
+                    this.filteredTrades = [...this.allTrades];
+                }
+                
+                this.currentPage = 1;
             } catch (error) {
                 console.error('Ошибка загрузки сделок:', error);
             }
@@ -238,10 +324,9 @@ function tradesPage() {
         },
 
         applyFilters() {
+            // Фильтрация по статусу теперь происходит на уровне API
+            // Здесь фильтруем только по паре и датам
             this.filteredTrades = this.allTrades.filter(trade => {
-                if (this.filters.status && trade.order_status !== this.filters.status) {
-                    return false;
-                }
                 if (this.filters.pair && trade.pair !== this.filters.pair) {
                     return false;
                 }
@@ -270,7 +355,8 @@ function tradesPage() {
                 dateFrom: '',
                 dateTo: ''
             };
-            this.applyFilters();
+            // Перезагружаем данные без фильтров
+            this.loadTrades();
         },
 
         get paginatedTrades() {
@@ -326,9 +412,40 @@ function tradesPage() {
             }
         },
 
+        // Фактическая прибыль (только для исполненных ордеров)
+        getActualProfit(trade) {
+            if (trade.order_status === 'FILLED' && trade.close_price) {
+                return (trade.close_price - trade.hedge_open_price) * trade.hedge_amount;
+            }
+            return 0;
+        },
+
+        // Планируемая прибыль (по лимитному ордеру)
+        getPlannedProfit(trade) {
+            return (trade.hedge_take_profit_price - trade.hedge_open_price) * trade.hedge_amount;
+        },
+
+        // Фактическая прибыль в процентах
+        getActualProfitPercent(trade) {
+            if (trade.order_status === 'FILLED' && trade.close_price) {
+                return ((trade.close_price - trade.hedge_open_price) / trade.hedge_open_price) * 100;
+            }
+            return 0;
+        },
+
+        // Планируемая прибыль в процентах
+        getPlannedProfitPercent(trade) {
+            return ((trade.hedge_take_profit_price - trade.hedge_open_price) / trade.hedge_open_price) * 100;
+        },
+
+        // Просадка в процентах между Freqtrade и ценой покупки хеджа
+        getDrawdownPercent(trade) {
+            return ((trade.freqtrade_open_price - trade.hedge_open_price) / trade.freqtrade_open_price) * 100;
+        },
+
+        // Обратная совместимость (оставляем старую функцию)
         getProfit(trade) {
-            if (!trade.close_price) return 0;
-            return (trade.close_price - trade.hedge_open_price) * trade.hedge_amount;
+            return this.getPlannedProfit(trade);
         },
 
         getStatusClass(status) {

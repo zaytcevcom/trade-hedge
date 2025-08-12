@@ -117,19 +117,19 @@ func (s *Server) executeTemplate(w http.ResponseWriter, templateName string, dat
 func (s *Server) handleAPITrades(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Получаем все хеджированные сделки
-	trades, err := s.hedgeRepo.GetActiveHedgedTrades(ctx)
+	// Получаем параметры фильтрации
+	statusParam := r.URL.Query().Get("status")
+
+	var status *string
+	if statusParam != "" {
+		status = &statusParam
+	}
+
+	// Используем универсальный метод для получения сделок
+	trades, err := s.hedgeRepo.GetHedgedTrades(ctx, status)
 	if err != nil {
 		s.sendError(w, "Ошибка получения сделок", http.StatusInternalServerError)
 		return
-	}
-
-	// Проверяем, нужны ли детальные данные
-	detailed := r.URL.Query().Get("detailed") == "true"
-	if detailed {
-		// Для детальной страницы получаем все сделки (включая закрытые)
-		// TODO: Реализовать метод для получения всех сделок
-		trades = s.getAllTrades(ctx)
 	}
 
 	// Преобразуем в представление для веб-интерфейса
@@ -196,7 +196,8 @@ func (s *Server) handleAPICheckStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Получаем количество активных ордеров до проверки
-	activeBefore, _ := s.hedgeRepo.GetActiveHedgedTrades(ctx)
+	pendingStatus := "PENDING"
+	activeBefore, _ := s.hedgeRepo.GetHedgedTrades(ctx, &pendingStatus)
 	beforeCount := len(activeBefore)
 
 	err := s.statusCheckerUseCase.CheckAllActiveOrders(ctx)
@@ -209,7 +210,7 @@ func (s *Server) handleAPICheckStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем количество активных ордеров после проверки
-	activeAfter, _ := s.hedgeRepo.GetActiveHedgedTrades(ctx)
+	activeAfter, _ := s.hedgeRepo.GetHedgedTrades(ctx, &pendingStatus)
 	afterCount := len(activeAfter)
 
 	// Количество обновленных ордеров = количество закрытых
@@ -226,11 +227,13 @@ func (s *Server) handleAPICheckStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // getAllTrades получает все сделки (включая закрытые)
-// TODO: Реализовать метод в репозитории для получения всех сделок
 func (s *Server) getAllTrades(ctx context.Context) []*entities.HedgedTrade {
-	// Пока используем только активные сделки
-	// В будущем нужно добавить метод GetAllHedgedTrades в репозиторий
-	trades, _ := s.hedgeRepo.GetActiveHedgedTrades(ctx)
+	// Получаем все сделки включая закрытые
+	trades, err := s.hedgeRepo.GetHedgedTrades(ctx, nil) // nil = все сделки
+	if err != nil {
+		// В случае ошибки возвращаем пустой массив
+		return []*entities.HedgedTrade{}
+	}
 	return trades
 }
 

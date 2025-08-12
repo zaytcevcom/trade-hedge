@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"strconv"
 	"time"
 )
 
@@ -64,5 +65,16 @@ func (t *Trade) ShouldBeHedged(maxLossPercent float64) bool {
 // CalculateTakeProfitPrice рассчитывает цену тейк-профита
 func (t *Trade) CalculateTakeProfitPrice(profitRatio float64) float64 {
 	takeProfitPercent := t.ProfitRatio * -100 * profitRatio // убыток в процентах * коэффициент
-	return t.CurrentRate * (1 + takeProfitPercent/100)
+	rawPrice := t.CurrentRate * (1 + takeProfitPercent/100)
+
+	// Округляем до 4 знаков для совместимости с Bybit
+	// Используем math.Round для более точного округления
+	multiplier := 10000.0 // 10^4 для 4 знаков
+	roundedPrice := float64(int(rawPrice*multiplier+0.5)) / multiplier
+
+	// Дополнительная проверка - форматируем строку и парсим обратно для гарантии точности
+	priceStr := strconv.FormatFloat(roundedPrice, 'f', 4, 64)
+	finalPrice, _ := strconv.ParseFloat(priceStr, 64)
+
+	return finalPrice
 }

@@ -18,6 +18,8 @@ type HedgeStrategyConfig struct {
 	MaxLossPercent float64
 	ProfitRatio    float64
 	BaseCurrency   string // Базовая валюта для покупки (например, USDT)
+	RetryAttempts  int    // Количество попыток размещения ордера
+	RetryDelay     int    // Задержка между попытками в секундах
 }
 
 // HedgeStrategyUseCase реализует сценарий хеджирования убытков
@@ -121,6 +123,17 @@ func (h *HedgeStrategyUseCase) hedgeTrade(ctx context.Context, trade *entities.T
 	// Рассчитываем количество валюты для покупки на фиксированную сумму
 	orderQuantity := entities.CalculateQuantityFromAmount(h.config.PositionAmount, trade.CurrentRate)
 
+	// Проверяем минимальный лимит ордера (Bybit требует минимум 5 USDT для большинства пар)
+	minOrderValue := 5.0 // Минимальная стоимость ордера в USDT
+	orderValue := h.config.PositionAmount
+
+	if orderValue < minOrderValue {
+		logger.LogWithTime("⚠️ ВНИМАНИЕ: Стоимость ордера %.2f %s меньше минимального лимита %.2f %s",
+			orderValue, h.config.BaseCurrency, minOrderValue, h.config.BaseCurrency)
+		logger.LogWithTime("💡 Рекомендуется увеличить position_amount в конфигурации до минимум %.2f %s",
+			minOrderValue, h.config.BaseCurrency)
+	}
+
 	logger.LogPlain("💰 Баланс %s: доступно %.4f, требуется %.4f\n",
 		h.config.BaseCurrency, balance.Available, requiredAmount)
 	logger.LogPlain("📊 Исходная сделка Freqtrade: %.6f %s по цене %.4f (убыток %.2f%%)\n",
@@ -154,25 +167,45 @@ func (h *HedgeStrategyUseCase) hedgeTrade(ctx context.Context, trade *entities.T
 	// Проверяем на частичное исполнение
 	fillRatio := actualQuantity / orderQuantity
 	if fillRatio < 0.95 { // Если исполнено менее 95%
-		logger.LogWithTime("⚠️ ЧАСТИЧНОЕ ИСПОЛНЕНИЕ: куплено %.6f %s из %.6f (%.1f%%)",
+		logger.LogWithTime("⚠️ ЧАСТИЧНОЕ ИСПОЛНЕНИЕ: куплено %.4f %s из %.4f (%.1f%%)",
 			actualQuantity, pair.ToBybitFormat(), orderQuantity, fillRatio*100)
+		logger.LogWithTime("💡 Возможные причины: недостаток ликвидности, большой спред, волатильность")
 	} else {
-		logger.LogWithTime("✅ Полное исполнение: куплено %.6f %s из %.6f (%.1f%%)",
+		logger.LogWithTime("✅ Полное исполнение: куплено %.4f %s из %.4f (%.1f%%)",
 			actualQuantity, pair.ToBybitFormat(), orderQuantity, fillRatio*100)
 	}
 
 	// 4. Рассчитываем цену тейк-профита
 	takeProfitPrice := trade.CalculateTakeProfitPrice(h.config.ProfitRatio)
+	logger.LogWithTime("🎯 Лимитный ордер на продажу: %.4f %s по цене %.4f (тейк-профит)",
+		actualQuantity, pair.ToBybitFormat(), takeProfitPrice)
 
-	// 5. Размещаем лимитный ордер на продажу фактически купленного количества
+	// 5. Размещаем лимитный ордер на продажу с ретраями
 	sellOrder := entities.NewLimitOrder(symbol, entities.OrderSideSell, actualQuantity, takeProfitPrice)
-	sellResult, err := h.exchangeService.PlaceOrder(ctx, sellOrder)
-	if err != nil {
-		return fmt.Errorf("ошибка размещения ордера на продажу: %w", err)
-	}
 
-	if !sellResult.Success {
-		return fmt.Errorf("неудачное размещение ордера на продажу: %s", sellResult.Error)
+	var sellResult *entities.OrderResult
+	maxRetries := h.config.RetryAttempts
+	retryDelay := time.Duration(h.config.RetryDelay) * time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.LogWithTime("📤 Попытка %d/%d размещения ордера на продажу", attempt, maxRetries)
+
+		sellResult, err = h.exchangeService.PlaceOrder(ctx, sellOrder)
+		if err == nil && sellResult.Success {
+			logger.LogWithTime("✅ Ордер на продажу успешно размещен с попытки %d", attempt)
+			break
+		}
+
+		if attempt < maxRetries {
+			logger.LogWithTime("⚠️ Попытка %d неудачна, ждем %v перед повтором: %v",
+				attempt, retryDelay, err)
+			time.Sleep(retryDelay)
+		} else {
+			if err != nil {
+				return fmt.Errorf("ошибка размещения ордера на продажу после %d попыток: %w", maxRetries, err)
+			}
+			return fmt.Errorf("неудачное размещение ордера на продажу после %d попыток: %s", maxRetries, sellResult.Error)
+		}
 	}
 
 	// 5. Сохраняем полную информацию о хеджировании

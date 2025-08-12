@@ -1,7 +1,7 @@
 # Trade Hedge Makefile
 # Удобные команды для разработки и развертывания
 
-.PHONY: help build run test clean docker-build docker-up docker-down logs
+.PHONY: help build run test clean docker-build docker-up docker-down logs clean-cache clean-docker clean-all rebuild
 
 # Помощь
 help:
@@ -16,7 +16,7 @@ help:
 	@echo "Docker команды:"
 	@echo "  docker-build   - Собрать Docker образ"
 	@echo "  docker-up      - Запустить production стек"
-	@echo "  docker-up-tools - Запустить с Adminer"
+
 	@echo "  docker-down    - Остановить production стек"
 	@echo "  docker-logs    - Показать логи контейнеров"
 	@echo ""
@@ -25,6 +25,12 @@ help:
 	@echo "  deps           - Установить/обновить зависимости"
 	@echo "  lint           - Запустить линтер"
 	@echo "  fmt            - Форматировать код"
+	@echo ""
+	@echo "Очистка кэшей:"
+	@echo "  clean-cache    - Очистить кэши Go"
+	@echo "  clean-docker   - Очистить кэши Docker"
+	@echo "  clean-all      - Очистить все кэши"
+	@echo "  rebuild        - Полная пересборка с очисткой кэшей"
 
 # Локальная сборка
 build:
@@ -62,15 +68,34 @@ docker-up:
 	fi
 	cd deploy/local && docker compose up -d
 
-# Запуск с инструментами (Adminer)
-docker-up-tools:
-	@echo "🚀 Запуск с инструментами..."
-	cd deploy/local && docker compose --profile tools up -d
+
 
 # Остановка локального стека
 docker-down:
 	@echo "🛑 Остановка локального стека..."
 	cd deploy/local && docker compose down
+
+nuke:
+	cd deploy/local && docker compose down -v --remove-orphans
+	cd deploy/local && docker compose pull
+
+# Очистка кэшей Go
+clean-cache:
+	@echo "🧹 Очистка кэшей Go..."
+	go clean -cache -modcache
+
+# Очистка кэшей Docker
+clean-docker:
+	@echo "🐳 Очистка кэшей Docker..."
+	docker system prune -af
+
+# Полная очистка кэшей (Go + Docker)
+clean-all: clean-cache clean-docker
+	@echo "✨ Все кэши очищены!"
+
+# Полная пересборка с очисткой кэшей
+rebuild: clean-all build docker-build
+	@echo "🚀 Полная пересборка завершена!"
 
 # Логи Docker
 docker-logs:
@@ -84,6 +109,9 @@ logs-app:
 logs-db:
 	cd deploy/local && docker compose logs -f postgres
 
+deploy-dockerhub:
+	docker build --platform=linux/amd64 -t zaytcevcom/trade:1.0.0 .
+	docker push zaytcevcom/trade:1.0.0
 
 
 # Установка зависимостей
@@ -133,11 +161,6 @@ restore-db:
 	@echo "📥 Восстановление БД из бэкапа..."
 	@read -p "Введите путь к файлу бэкапа: " backup_file; \
 	docker compose exec -T postgres psql -U postgres trade_hedge < $$backup_file
-
-# Полная очистка (ОСТОРОЖНО!)
-nuke:
-	cd deploy/local && docker compose down -v --remove-orphans
-	cd deploy/local && docker compose pull
 
 # Быстрый старт для новых пользователей
 quickstart: setup-env

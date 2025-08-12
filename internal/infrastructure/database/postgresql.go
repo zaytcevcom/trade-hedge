@@ -133,20 +133,36 @@ func (r *PostgreSQLTradeRepository) SaveHedgedTrade(ctx context.Context, hedgedT
 	return nil
 }
 
-// GetActiveHedgedTrades получает все активные хеджированные сделки
-func (r *PostgreSQLTradeRepository) GetActiveHedgedTrades(ctx context.Context) ([]*entities.HedgedTrade, error) {
-	query := `
-		SELECT freqtrade_trade_id, pair, bybit_order_id, hedge_time,
-			   freqtrade_open_price, freqtrade_amount, freqtrade_profit_ratio,
-			   hedge_open_price, hedge_amount, hedge_take_profit_price,
-			   order_status, last_status_check, close_price, close_time
-		FROM hedged_trades 
-		WHERE order_status NOT IN ('FILLED', 'CANCELLED', 'REJECTED')
-		ORDER BY hedge_time DESC`
+// GetHedgedTrades получает хеджированные сделки по статусу
+func (r *PostgreSQLTradeRepository) GetHedgedTrades(ctx context.Context, status *string) ([]*entities.HedgedTrade, error) {
+	var query string
+	var args []interface{}
 
-	rows, err := r.pool.Query(ctx, query)
+	if status == nil {
+		// Если статус не указан (nil), возвращаем все сделки
+		query = `
+			SELECT freqtrade_trade_id, pair, bybit_order_id, hedge_time,
+				   freqtrade_open_price, freqtrade_amount, freqtrade_profit_ratio,
+				   hedge_open_price, hedge_amount, hedge_take_profit_price,
+				   order_status, last_status_check, close_price, close_time
+			FROM hedged_trades 
+			ORDER BY hedge_time DESC`
+	} else {
+		// Если указан конкретный статус, фильтруем по нему
+		query = `
+			SELECT freqtrade_trade_id, pair, bybit_order_id, hedge_time,
+				   freqtrade_open_price, freqtrade_amount, freqtrade_profit_ratio,
+				   hedge_open_price, hedge_amount, hedge_take_profit_price,
+				   order_status, last_status_check, close_price, close_time
+			FROM hedged_trades 
+			WHERE order_status = $1
+			ORDER BY hedge_time DESC`
+		args = append(args, *status)
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения активных хеджированных сделок: %w", err)
+		return nil, fmt.Errorf("ошибка получения хеджированных сделок: %w", err)
 	}
 	defer rows.Close()
 

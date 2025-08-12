@@ -52,6 +52,8 @@ type StrategyConfig struct {
 	ProfitRatio    float64 `yaml:"profit_ratio"`
 	BaseCurrency   string  `yaml:"base_currency"`
 	CheckInterval  int     `yaml:"check_interval"` // Интервал проверки в секундах (0 = одноразовое выполнение)
+	RetryAttempts  int     `yaml:"retry_attempts"` // Количество попыток размещения ордера
+	RetryDelay     int     `yaml:"retry_delay"`    // Задержка между попытками в секундах
 }
 
 // WebUIConfig конфигурация веб-интерфейса
@@ -94,11 +96,13 @@ func (c *Config) setDefaults() {
 	c.Database.DBName = "trade_hedge"
 	c.Database.SSLMode = "disable"
 
-	c.Strategy.PositionAmount = 100.0
+	c.Strategy.PositionAmount = 50.0
 	c.Strategy.MaxLossPercent = 3.0
-	c.Strategy.ProfitRatio = 1.5
+	c.Strategy.ProfitRatio = 0.7
 	c.Strategy.BaseCurrency = "USDT"
 	c.Strategy.CheckInterval = 300
+	c.Strategy.RetryAttempts = 3
+	c.Strategy.RetryDelay = 2
 
 	c.WebUI.Enabled = false
 	c.WebUI.Host = "localhost"
@@ -197,6 +201,16 @@ func (c *Config) loadFromEnv() {
 			c.Strategy.CheckInterval = interval
 		}
 	}
+	if v := os.Getenv("STRATEGY_RETRY_ATTEMPTS"); v != "" {
+		if attempts, err := strconv.Atoi(v); err == nil {
+			c.Strategy.RetryAttempts = attempts
+		}
+	}
+	if v := os.Getenv("STRATEGY_RETRY_DELAY"); v != "" {
+		if delay, err := strconv.Atoi(v); err == nil {
+			c.Strategy.RetryDelay = delay
+		}
+	}
 
 	// WebUI
 	if v := os.Getenv("WEBUI_ENABLED"); v != "" {
@@ -283,6 +297,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Strategy.CheckInterval < 0 {
 		return fmt.Errorf("strategy.check_interval не может быть отрицательным, получен: %d", c.Strategy.CheckInterval)
+	}
+	if c.Strategy.RetryAttempts <= 0 {
+		return fmt.Errorf("strategy.retry_attempts должен быть положительным, получен: %d", c.Strategy.RetryAttempts)
+	}
+	if c.Strategy.RetryDelay < 0 {
+		return fmt.Errorf("strategy.retry_delay не может быть отрицательным, получен: %d", c.Strategy.RetryDelay)
 	}
 
 	// Валидация WebUI
