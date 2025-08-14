@@ -67,12 +67,46 @@
 
     <!-- Управление -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Быстрые действия -->
+
+        <!-- Баланс Bybit -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-play-circle mr-2 text-blue-600"></i>Быстрые действия
+                <i class="fas fa-wallet mr-2 text-blue-600"></i>Баланс Bybit
             </h3>
             <div class="space-y-3">
+                <!-- USDT баланс -->
+                <div class="bg-blue-50 rounded-lg p-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-blue-800">USDT</span>
+                        <span class="text-lg font-bold text-blue-900" x-text="formatCurrency(balance.usdt?.Available || 0)">$0.00</span>
+                    </div>
+                    <div class="text-xs text-blue-600 mt-1">
+                        Всего: <span x-text="formatCurrency(balance.usdt?.Total || 0)">$0.00</span>
+                    </div>
+                </div>
+                
+                <!-- Криптовалюты -->
+                <div class="grid grid-cols-2 gap-2" x-show="balance.crypto && Object.keys(balance.crypto).length > 0">
+                    <template x-for="(crypto, symbol) in balance.crypto" :key="symbol">
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-gray-700" x-text="symbol"></span>
+                                <span class="text-sm font-bold text-gray-900" x-text="formatNumber(crypto.available || 0)">0</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Кнопка обновления -->
+                <button @click="refreshBalance()" 
+                        :disabled="balanceLoading"
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    <span x-show="!balanceLoading">Обновить баланс</span>
+                    <span x-show="balanceLoading">Обновляется...</span>
+                </button>
+                
+                <!-- Кнопка выполнения хеджирования -->
                 <button @click="executeStrategy()" 
                         :disabled="loading"
                         class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
@@ -81,6 +115,7 @@
                     <span x-show="loading">Выполняется...</span>
                 </button>
                 
+                <!-- Кнопка проверки статусов -->
                 <button @click="checkStatuses()" 
                         :disabled="loading"
                         class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors">
@@ -198,23 +233,32 @@ function dashboard() {
         notification: '',
         notificationType: 'success',
         lastCheck: null,
+        balance: {},
+        balanceLoading: false,
 
         init() {
+            console.log('🚀 Инициализация дашборда...');
             this.loadData();
+            this.loadBalance();
             // Автообновление каждые 30 секунд
             setInterval(() => this.loadData(), 30000);
+            // Автообновление баланса каждые 2 минуты
+            setInterval(() => this.loadBalance(), 120000);
         },
 
         async loadData() {
             try {
+                console.log('🔄 Загружаем данные о сделках...');
                 const response = await fetch('/api/trades');
                 const data = await response.json();
+                
+                console.log('📊 Данные о сделках загружены:', data);
                 
                 this.recentTrades = data.trades || [];
                 this.stats = data.stats || this.stats;
                 this.lastCheck = new Date();
             } catch (error) {
-                console.error('Ошибка загрузки данных:', error);
+                console.error('❌ Ошибка загрузки данных:', error);
             }
         },
 
@@ -315,6 +359,48 @@ function dashboard() {
             
             const sign = profitPercent >= 0 ? '+' : '';
             return sign + profitPercent.toFixed(2) + '%';
+        },
+
+        // Загружает баланс Bybit
+        async loadBalance() {
+            try {
+                console.log('🔄 Загружаем баланс...');
+                const response = await fetch('/api/balance');
+                const result = await response.json();
+                
+                console.log('📊 Ответ API баланса:', result);
+                
+                if (result.success) {
+                    this.balance = result.data;
+                    console.log('✅ Баланс загружен:', this.balance);
+                } else {
+                    console.error('❌ Ошибка загрузки баланса:', result.message);
+                }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки баланса:', error);
+            }
+        },
+
+        // Обновляет баланс
+        async refreshBalance() {
+            this.balanceLoading = true;
+            try {
+                await this.loadBalance();
+                this.showNotification('Баланс обновлен', 'success');
+            } catch (error) {
+                this.showNotification('Ошибка обновления баланса: ' + error.message, 'error');
+            }
+            this.balanceLoading = false;
+        },
+
+        // Форматирует числа для криптовалют
+        formatNumber(amount) {
+            if (amount === null || amount === undefined) return '—';
+            if (amount < 0.000001) return amount.toExponential(2);
+            if (amount < 0.001) return amount.toFixed(8);
+            if (amount < 1) return amount.toFixed(6);
+            if (amount < 1000) return amount.toFixed(4);
+            return amount.toFixed(2);
         }
     }
 }

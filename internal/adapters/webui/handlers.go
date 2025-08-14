@@ -226,6 +226,43 @@ func (s *Server) handleAPICheckStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAPIBalance API для получения баланса Bybit
+func (s *Server) handleAPIBalance(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Получаем баланс USDT
+	usdtBalance, err := s.hedgeUseCase.GetExchangeService().GetBalance(ctx, "USDT")
+	if err != nil {
+		s.sendError(w, "Ошибка получения баланса USDT", http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем баланс основных криптовалют
+	balances := make(map[string]interface{})
+
+	// Популярные криптовалюты для отображения
+	currencies := []string{"BTC", "ETH", "SOL", "XRP", "DOGE", "PEPE", "TON", "ONDO"}
+
+	for _, currency := range currencies {
+		if balance, err := s.hedgeUseCase.GetExchangeService().GetBalance(ctx, currency); err == nil {
+			balances[currency] = map[string]interface{}{
+				"available": balance.Available,
+				"total":     balance.Total,
+			}
+		}
+	}
+
+	response := map[string]interface{}{
+		"usdt":   usdtBalance,
+		"crypto": balances,
+	}
+
+	s.sendJSON(w, APIResponse{
+		Success: true,
+		Data:    response,
+	})
+}
+
 // getAllTrades получает все сделки (включая закрытые)
 func (s *Server) getAllTrades(ctx context.Context) []*entities.HedgedTrade {
 	// Получаем все сделки включая закрытые

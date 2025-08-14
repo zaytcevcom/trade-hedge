@@ -33,3 +33,8 @@ func (e *ExchangeServiceAdapter) GetBalance(ctx context.Context, asset string) (
 func (e *ExchangeServiceAdapter) GetOrderStatus(ctx context.Context, orderID, symbol string) (*services.OrderStatusInfo, error) {
 	return e.bybitClient.GetOrderStatus(ctx, orderID, symbol)
 }
+
+// GetInstrumentInfo получает информацию об инструменте (минимальные лимиты, размеры шагов)
+func (e *ExchangeServiceAdapter) GetInstrumentInfo(ctx context.Context, symbol string) (*services.InstrumentInfo, error) {
+	return e.bybitClient.GetInstrumentInfo(ctx, symbol)
+}

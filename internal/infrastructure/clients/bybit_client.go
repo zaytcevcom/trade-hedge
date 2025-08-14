@@ -16,6 +16,7 @@ import (
 	"trade-hedge/internal/domain/entities"
 	"trade-hedge/internal/domain/services"
 	"trade-hedge/internal/infrastructure/config"
+	"trade-hedge/internal/pkg/logger"
 )
 
 // BybitClient клиент для работы с Bybit API
@@ -82,6 +83,31 @@ type BybitOrderStatusResponse struct {
 	} `json:"result"`
 }
 
+// BybitInstrumentInfoResponse ответ от Bybit API с информацией об инструменте
+type BybitInstrumentInfoResponse struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	Result  struct {
+		List []struct {
+			Symbol        string `json:"symbol"`
+			BaseCoin      string `json:"baseCoin"`
+			QuoteCoin     string `json:"quoteCoin"`
+			Status        string `json:"status"`
+			LotSizeFilter struct {
+				BasePrecision  string `json:"basePrecision"`
+				QuotePrecision string `json:"quotePrecision"`
+				MinOrderQty    string `json:"minOrderQty"`
+				MinOrderAmt    string `json:"minOrderAmt"`
+				MaxOrderQty    string `json:"maxOrderQty"`
+				MaxOrderAmt    string `json:"maxOrderAmt"`
+			} `json:"lotSizeFilter"`
+			PriceFilter struct {
+				TickSize string `json:"tickSize"`
+			} `json:"priceFilter"`
+		} `json:"list"`
+	} `json:"result"`
+}
+
 // NewBybitClient создает новый клиент Bybit
 func NewBybitClient(config *config.BybitConfig) *BybitClient {
 	return &BybitClient{
@@ -106,7 +132,8 @@ func (b *BybitClient) PlaceOrder(ctx context.Context, order *entities.Order) (*e
 
 	// Для лимитных ордеров добавляем цену
 	if order.Type == entities.OrderTypeLimit {
-		params["price"] = strconv.FormatFloat(order.Price, 'f', 4, 64)
+		// Используем 8 знаков после запятой для очень маленьких цен
+		params["price"] = strconv.FormatFloat(order.Price, 'f', 8, 64)
 	}
 
 	paramStr, err := json.Marshal(params)
@@ -210,9 +237,6 @@ func (b *BybitClient) GetBalance(ctx context.Context, asset string) (*entities.B
 		return nil, fmt.Errorf("ошибка чтения ответа: %w", err)
 	}
 
-	// Логируем размер ответа для отладки
-	fmt.Printf("🔍 Bybit Balance API ответ (%d байт)\n", len(body))
-
 	// Проверка на ошибку
 	var errResp BybitErrorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.RetCode != 0 {
@@ -237,6 +261,10 @@ func (b *BybitClient) GetBalance(ctx context.Context, asset string) (*entities.B
 					availableBalance = walletBalance
 				}
 
+				// Логируем баланс с временной меткой
+				logger.LogWithTime("🔍 Bybit Balance API: %s - доступно %.4f, общий %.4f",
+					asset, availableBalance, walletBalance)
+
 				return &entities.Balance{
 					Asset:     asset,
 					Available: availableBalance, // Доступный для вывода/торговли
@@ -247,6 +275,73 @@ func (b *BybitClient) GetBalance(ctx context.Context, asset string) (*entities.B
 	}
 
 	return nil, fmt.Errorf("валюта %s не найдена в балансе UNIFIED аккаунта", asset)
+}
+
+// GetInstrumentInfo получает информацию об инструменте (минимальные лимиты, размеры шагов и т.д.)
+func (b *BybitClient) GetInstrumentInfo(ctx context.Context, symbol string) (*services.InstrumentInfo, error) {
+	// Создаем параметры запроса
+	params := fmt.Sprintf("category=spot&symbol=%s", symbol)
+
+	// Создание запроса (публичный API, не требует подписи)
+	url := fmt.Sprintf("https://api.bybit.com/v5/market/instruments-info?%s", params)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка создания запроса: %w", err)
+	}
+
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка отправки запроса: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка чтения ответа: %w", err)
+	}
+
+	// Логируем ответ для отладки
+	logger.LogWithTime("🔍 Bybit Instrument Info API: %s - получено %d байт", symbol, len(body))
+	// Ответ получен успешно
+
+	// Проверка на ошибку
+	var errResp BybitErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.RetCode != 0 {
+		return nil, fmt.Errorf("ошибка Bybit: %s (код: %d)", errResp.RetMsg, errResp.RetCode)
+	}
+
+	// Парсинг успешного ответа
+	var result BybitInstrumentInfoResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("ошибка парсинга ответа: %w", err)
+	}
+
+	if len(result.Result.List) == 0 {
+		return nil, fmt.Errorf("инструмент %s не найден", symbol)
+	}
+
+	instrument := result.Result.List[0]
+
+	// Парсим численные значения
+	minOrderQty, _ := strconv.ParseFloat(instrument.LotSizeFilter.MinOrderQty, 64)
+	minOrderAmt, _ := strconv.ParseFloat(instrument.LotSizeFilter.MinOrderAmt, 64)
+	maxOrderQty, _ := strconv.ParseFloat(instrument.LotSizeFilter.MaxOrderQty, 64)
+	maxOrderAmt, _ := strconv.ParseFloat(instrument.LotSizeFilter.MaxOrderAmt, 64)
+	tickSize, _ := strconv.ParseFloat(instrument.PriceFilter.TickSize, 64)
+	stepSize, _ := strconv.ParseFloat(instrument.LotSizeFilter.BasePrecision, 64) // Step size is base precision
+
+	return &services.InstrumentInfo{
+		Symbol:      instrument.Symbol,
+		BaseCoin:    instrument.BaseCoin,
+		QuoteCoin:   instrument.QuoteCoin,
+		MinOrderQty: minOrderQty,
+		MinOrderAmt: minOrderAmt,
+		MaxOrderQty: maxOrderQty,
+		MaxOrderAmt: maxOrderAmt,
+		TickSize:    tickSize,
+		StepSize:    stepSize,
+		Status:      instrument.Status,
+	}, nil
 }
 
 // GetOrderStatus получает статус ордера по ID

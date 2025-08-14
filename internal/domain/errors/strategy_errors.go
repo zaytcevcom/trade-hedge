@@ -18,6 +18,8 @@ const (
 	ErrorTypeNoLossyTrades
 	// ErrorTypeInsufficientBalance недостаточно средств
 	ErrorTypeInsufficientBalance
+	// ErrorTypeInsufficientBalanceForMinLimit недостаточно средств для минимального лимита
+	ErrorTypeInsufficientBalanceForMinLimit
 	// ErrorTypeExchangeError ошибка биржи
 	ErrorTypeExchangeError
 )
@@ -29,7 +31,9 @@ func (e *StrategyError) Error() string {
 
 // IsExpected проверяет, является ли ошибка ожидаемой (не критической)
 func (e *StrategyError) IsExpected() bool {
-	return e.Type == ErrorTypeNoTrades || e.Type == ErrorTypeNoLossyTrades
+	return e.Type == ErrorTypeNoTrades ||
+		e.Type == ErrorTypeNoLossyTrades ||
+		e.Type == ErrorTypeInsufficientBalanceForMinLimit
 }
 
 // NewNoTradesError создает ошибку "нет сделок"
@@ -53,6 +57,14 @@ func NewInsufficientBalanceError(required, available float64, currency string) *
 	return &StrategyError{
 		Type:    ErrorTypeInsufficientBalance,
 		Message: fmt.Sprintf("Недостаточно средств для покупки: нужно %.4f %s, доступно %.4f %s", required, currency, available, currency),
+	}
+}
+
+// NewInsufficientBalanceForMinLimitError создает ошибку недостатка средств для минимального лимита
+func NewInsufficientBalanceForMinLimitError(minLimit, available float64, currency string) *StrategyError {
+	return &StrategyError{
+		Type:    ErrorTypeInsufficientBalanceForMinLimit,
+		Message: fmt.Sprintf("Недостаточно средств для минимального лимита ордера: требуется %.2f %s, доступно %.2f %s", minLimit, currency, available, currency),
 	}
 }
 

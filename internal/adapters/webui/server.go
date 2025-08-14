@@ -84,6 +84,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/status", s.handleAPIStatus)
 	mux.HandleFunc("/api/execute", s.handleAPIExecute)
 	mux.HandleFunc("/api/check-status", s.handleAPICheckStatus)
+	mux.HandleFunc("/api/balance", s.handleAPIBalance)
 }
 
 // Start запускает веб-сервер
