@@ -7,7 +7,7 @@
     </div>
 
     <!-- Статистические карточки -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Всего сделок -->
         <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center">
@@ -64,18 +64,7 @@
             </div>
         </div>
 
-        <!-- Средний размер позиции -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
-                    <i class="fas fa-chart-line text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Средний размер позиции</p>
-                    <p class="text-2xl font-semibold text-indigo-900" x-text="formatCurrency(stats.averageOrderSize)">$0.00</p>
-                </div>
-            </div>
-        </div>
+
     </div>
 
     <!-- Управление -->
@@ -244,8 +233,7 @@ function dashboard() {
             total: 0,
             active: 0,
             completed: 0,
-            totalProfit: 0,
-            averageOrderSize: 0
+            totalProfit: 0
         },
         recentTrades: [],
         loading: false,
