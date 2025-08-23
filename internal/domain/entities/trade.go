@@ -62,6 +62,26 @@ func (t *Trade) ShouldBeHedged(maxLossPercent float64) bool {
 	return t.ProfitRatio < threshold
 }
 
+// SortTradesByDrawdown сортирует сделки по максимальной просадке (от большей к меньшей)
+// ProfitRatio отрицательный при убытке, поэтому сортируем по возрастанию (от -0.05 к -0.02)
+func SortTradesByDrawdown(trades []*Trade) {
+	if len(trades) <= 1 {
+		return
+	}
+
+	// Сортируем по убыванию просадки (от большей к меньшей)
+	// Поскольку ProfitRatio отрицательный при убытке, сортируем по возрастанию
+	for i := 0; i < len(trades)-1; i++ {
+		for j := i + 1; j < len(trades); j++ {
+			// Если просадка i-й сделки меньше просадки j-й сделки, меняем местами
+			// ProfitRatio отрицательный, поэтому сравниваем наоборот
+			if trades[i].ProfitRatio > trades[j].ProfitRatio {
+				trades[i], trades[j] = trades[j], trades[i]
+			}
+		}
+	}
+}
+
 // CalculateTakeProfitPrice рассчитывает цену тейк-профита
 func (t *Trade) CalculateTakeProfitPrice(profitRatio float64) float64 {
 	takeProfitPercent := t.ProfitRatio * -100 * profitRatio // убыток в процентах * коэффициент

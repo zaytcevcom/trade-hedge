@@ -70,7 +70,18 @@ func (h *HedgeStrategyUseCase) ExecuteHedgeStrategy(ctx context.Context) error {
 		return errors.NewNoTradesError()
 	}
 
-	// 3. Находим и пытаемся хеджировать подходящие сделки
+	// 3. Сортируем сделки по максимальной просадке (от большей к меньшей)
+	entities.SortTradesByDrawdown(unhedgedTrades)
+	logger.LogWithTime("📊 Отсортировали %d сделок по просадке (от большей к меньшей)", len(unhedgedTrades))
+
+	// Логируем детали сортировки для всех сделок
+	logger.LogWithTime("📋 Детали сортировки сделок:")
+	for i, trade := range unhedgedTrades {
+		drawdownPercent := trade.ProfitRatio * -100
+		logger.LogWithTime("   %d. %s: просадка %.2f%%", i+1, trade.Pair, drawdownPercent)
+	}
+
+	// 4. Находим и пытаемся хеджировать подходящие сделки
 	return h.findAndHedgeTrade(ctx, unhedgedTrades)
 }
 
@@ -97,16 +108,24 @@ func (h *HedgeStrategyUseCase) findAndHedgeTrade(ctx context.Context, trades []*
 	var lastError error
 	var triedPairs []string
 
+	logger.LogWithTime("🎯 Начинаем поиск сделок для хеджирования (отсортированы по просадке)")
+
 	// Пытаемся найти подходящую сделку для хеджирования
-	for _, trade := range trades {
+	for i, trade := range trades {
+		drawdownPercent := trade.ProfitRatio * -100 // Конвертируем в проценты
+
 		if !trade.ShouldBeHedged(h.config.MaxLossPercent) {
+			logger.LogWithTime("⏭️ [%d/%d] Пропускаем пару %s (просадка: %.2f%% < порог %.2f%%)",
+				i+1, len(trades), trade.Pair, drawdownPercent, h.config.MaxLossPercent)
 			continue
 		}
 
 		pair := valueobjects.NewTradingPair(trade.Pair)
 		triedPairs = append(triedPairs, pair.String())
 
-		logger.LogWithTime("🔍 Пробуем хеджировать пару %s...", pair.String())
+		// Логируем просадку для каждой сделки
+		logger.LogWithTime("🔍 [%d/%d] Пробуем хеджировать пару %s (просадка: %.2f%%)...",
+			i+1, len(trades), pair.String(), drawdownPercent)
 
 		// Пытаемся выполнить хеджирование
 		err := h.hedgeTrade(ctx, trade)
@@ -138,6 +157,7 @@ func (h *HedgeStrategyUseCase) findAndHedgeTrade(ctx context.Context, trades []*
 	}
 
 	// Нет подходящих сделок для хеджирования
+	logger.LogWithTime("ℹ️ Обработано %d сделок, подходящих для хеджирования не найдено", len(trades))
 	return errors.NewNoLossyTradesError(h.config.MaxLossPercent)
 }
 
@@ -155,28 +175,18 @@ func (h *HedgeStrategyUseCase) hedgeTrade(ctx context.Context, trade *entities.T
 	// Рассчитываем необходимую сумму для покупки с запасом на проскальзывание
 	requiredAmount := h.config.PositionAmount * 1.01 // +1% запас на проскальзывание
 
-	// Автоматически корректируем размер позиции, если баланса недостаточно
-	adjustedPositionAmount := h.config.PositionAmount
+	// Проверяем, достаточно ли баланса для указанной в настройках суммы позиции
+	// Если баланса недостаточно - пропускаем пару, НЕ корректируем размер позиции
 	if !balance.HasSufficientBalance(requiredAmount) {
-		// Уменьшаем размер позиции до доступного баланса с запасом
-		adjustedPositionAmount = balance.Available / 1.01 // Убираем запас
 		logger.LogWithTime("⚠️ ВНИМАНИЕ: Недостаточно баланса для запрошенной позиции")
-		logger.LogWithTime("💡 Автоматически корректируем размер позиции с %.2f до %.2f %s",
-			h.config.PositionAmount, adjustedPositionAmount, h.config.BaseCurrency)
-
-		// Проверяем минимальный размер позиции
-		if adjustedPositionAmount < 10.0 { // Минимум 10 USDT
-			return fmt.Errorf("недостаточно баланса для минимальной позиции: доступно %.2f %s, минимум 10.0 %s",
-				balance.Available, h.config.BaseCurrency, h.config.BaseCurrency)
-		}
-	}
-
-	// Обновляем требуемую сумму с учетом скорректированного размера позиции
-	requiredAmount = adjustedPositionAmount * 1.01
-
-	if !balance.HasSufficientBalance(requiredAmount) {
+		logger.LogWithTime("💡 Требуется: %.2f %s, доступно: %.2f %s",
+			requiredAmount, h.config.BaseCurrency, balance.Available, h.config.BaseCurrency)
+		logger.LogWithTime("💡 Пропускаем пару %s - недостаточно баланса для указанной суммы позиции", pair.String())
 		return errors.NewInsufficientBalanceError(requiredAmount, balance.Available, h.config.BaseCurrency)
 	}
+
+	// Используем фиксированный размер позиции из настроек (без автоматической корректировки)
+	adjustedPositionAmount := h.config.PositionAmount
 
 	// Рассчитываем количество валюты для покупки на фиксированную сумму
 	orderQuantity := entities.CalculateQuantityFromAmount(adjustedPositionAmount, trade.CurrentRate)

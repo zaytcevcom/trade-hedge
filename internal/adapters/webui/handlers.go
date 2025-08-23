@@ -13,10 +13,11 @@ import (
 
 // TradeStats статистика по сделкам
 type TradeStats struct {
-	Total       int     `json:"total"`
-	Active      int     `json:"active"`
-	Completed   int     `json:"completed"`
-	TotalProfit float64 `json:"totalProfit"`
+	Total          int     `json:"total"`
+	Active         int     `json:"active"`
+	Completed      int     `json:"completed"`
+	TotalProfit    float64 `json:"totalProfit"`
+	TotalOrderSize float64 `json:"totalOrderSize"` // Общий размер всех ордеров в долларах
 }
 
 // APIResponse универсальный ответ API
@@ -50,6 +51,7 @@ type TradeView struct {
 	ClosePrice           *float64   `json:"close_price"`
 	CloseTime            *time.Time `json:"close_time"`
 	Profit               *float64   `json:"profit"`
+	OrderSizeUSD         float64    `json:"order_size_usd"` // Размер ордера в долларах
 }
 
 // PageData данные для рендеринга страниц
@@ -301,6 +303,9 @@ func (s *Server) convertToTradeViews(trades []*entities.HedgedTrade) []TradeView
 			view.Profit = profit
 		}
 
+		// Рассчитываем размер ордера в долларах (количество * цена открытия)
+		view.OrderSizeUSD = trade.HedgeAmount * trade.HedgeOpenPrice
+
 		views[i] = view
 	}
 
@@ -314,6 +319,10 @@ func (s *Server) calculateStats(trades []*entities.HedgedTrade) TradeStats {
 	}
 
 	for _, trade := range trades {
+		// Рассчитываем общий размер всех ордеров
+		orderSize := trade.HedgeAmount * trade.HedgeOpenPrice
+		stats.TotalOrderSize += orderSize
+
 		if trade.IsActive() {
 			stats.Active++
 		} else {

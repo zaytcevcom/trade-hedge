@@ -7,7 +7,7 @@
     </div>
 
     <!-- Статистические карточки -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <!-- Всего сделок -->
         <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center">
@@ -60,6 +60,19 @@
                        x-text="formatCurrency(stats.totalProfit)">
                         $0.00
                     </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Общий размер ордеров -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
+                    <i class="fas fa-chart-pie text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Общий размер ордеров</p>
+                    <p class="text-2xl font-semibold text-indigo-900" x-text="formatCurrency(stats.totalOrderSize)">$0.00</p>
                 </div>
             </div>
         </div>
@@ -176,6 +189,9 @@
                             Прибыль
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Размер ордера
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Профит %
                         </th>
                     </tr>
@@ -195,6 +211,8 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm"
                                 :class="trade.profit >= 0 ? 'text-green-600' : 'text-red-600'"
                                 x-text="formatCurrency(trade.profit)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                                x-text="formatCurrency(trade.order_size_usd)"></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm"
                                 :class="getProfitPercent(trade) >= 0 ? 'text-green-600' : 'text-red-600'"
                                 x-text="getProfitPercentText(trade)"></td>

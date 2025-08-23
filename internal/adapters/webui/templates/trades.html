@@ -84,6 +84,9 @@
                             Факт (продажа)
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Размер ордера
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Кол-во
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -159,6 +162,12 @@
                                     </div>
                                 </template>
                                 <div class="text-xs text-gray-500">Цена продажи</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="font-medium text-blue-600">
+                                    $<span x-text="trade.order_size_usd.toFixed(2)"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">Размер позиции</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <div class="font-medium">
