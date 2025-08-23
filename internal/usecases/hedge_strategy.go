@@ -60,10 +60,10 @@ func (h *HedgeStrategyUseCase) ExecuteHedgeStrategy(ctx context.Context) error {
 		return fmt.Errorf("ошибка получения активных сделок: %w", err)
 	}
 
-	// 2. Фильтруем уже хеджированные сделки
+	// 2. Фильтруем сделки, исключая только те, что имеют активные ордера в ожидании
 	unhedgedTrades, err := h.filterUnhedgedTrades(ctx, trades)
 	if err != nil {
-		return fmt.Errorf("ошибка фильтрации хеджированных сделок: %w", err)
+		return fmt.Errorf("ошибка фильтрации сделок: %w", err)
 	}
 
 	if len(unhedgedTrades) == 0 {
@@ -85,19 +85,44 @@ func (h *HedgeStrategyUseCase) ExecuteHedgeStrategy(ctx context.Context) error {
 	return h.findAndHedgeTrade(ctx, unhedgedTrades)
 }
 
-// filterUnhedgedTrades фильтрует сделки, исключая уже хеджированные
+// filterUnhedgedTrades фильтрует сделки, исключая только те, что имеют активные ордера в ожидании (PENDING)
+// Сделки с завершенными ордерами (FILLED, CANCELLED, REJECTED) могут хеджироваться повторно
 func (h *HedgeStrategyUseCase) filterUnhedgedTrades(ctx context.Context, trades []*entities.Trade) ([]*entities.Trade, error) {
 	var unhedged []*entities.Trade
 
 	for _, trade := range trades {
-		isHedged, err := h.hedgeRepo.IsTradeHedged(ctx, trade.ID)
+		// Получаем историю хеджирования для сделки
+		hedgeHistory, err := h.hedgeRepo.GetHedgeHistory(ctx, trade.ID)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка проверки хеджирования для сделки %d: %w", trade.ID, err)
+			return nil, fmt.Errorf("ошибка получения истории хеджирования для сделки %d: %w", trade.ID, err)
 		}
 
-		if !isHedged {
+		// Если нет истории хеджирования - сделка подходит для хеджирования
+		if len(hedgeHistory) == 0 {
 			unhedged = append(unhedged, trade)
+			continue
 		}
+
+		// Проверяем, есть ли активные ордера в ожидании
+		hasActiveOrders := false
+		for _, hedge := range hedgeHistory {
+			if hedge.OrderStatus == entities.OrderStatusPending {
+				hasActiveOrders = true
+				break
+			}
+		}
+
+		// Если есть активные ордера - пропускаем (ждем исполнения)
+		if hasActiveOrders {
+			logger.LogWithTime("⏳ Сделка %d (%s) имеет активный ордер в ожидании - пропускаем",
+				trade.ID, trade.Pair)
+			continue
+		}
+
+		// Если нет активных ордеров - сделка подходит для повторного хеджирования
+		logger.LogWithTime("🔄 Сделка %d (%s) имеет %d завершенных ордеров - можно хеджировать повторно",
+			trade.ID, trade.Pair, len(hedgeHistory))
+		unhedged = append(unhedged, trade)
 	}
 
 	return unhedged, nil

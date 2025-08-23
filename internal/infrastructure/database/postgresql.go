@@ -89,10 +89,11 @@ func (r *PostgreSQLTradeRepository) initTables() error {
 }
 
 // IsTradeHedged проверяет, была ли сделка хеджирована
+// Считаются хеджированными только сделки с успешно исполненными ордерами (FILLED)
 func (r *PostgreSQLTradeRepository) IsTradeHedged(ctx context.Context, tradeID int) (bool, error) {
 	var count int
 	err := r.pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM hedged_trades WHERE freqtrade_trade_id = $1",
+		"SELECT COUNT(*) FROM hedged_trades WHERE freqtrade_trade_id = $1 AND order_status = 'FILLED'",
 		tradeID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("ошибка проверки хеджирования: %w", err)
@@ -216,4 +217,57 @@ func (r *PostgreSQLTradeRepository) UpdateHedgedTradeStatus(ctx context.Context,
 	}
 
 	return nil
+}
+
+// GetHedgeHistory получает историю хедж-ордеров по конкретной сделке
+func (r *PostgreSQLTradeRepository) GetHedgeHistory(ctx context.Context, tradeID int) ([]*entities.HedgedTrade, error) {
+	query := `
+		SELECT freqtrade_trade_id, pair, bybit_order_id, hedge_time,
+			   freqtrade_open_price, freqtrade_amount, freqtrade_profit_ratio,
+			   hedge_open_price, hedge_amount, hedge_take_profit_price,
+			   order_status, last_status_check, close_price, close_time
+		FROM hedged_trades 
+		WHERE freqtrade_trade_id = $1
+		ORDER BY hedge_time DESC`
+
+	rows, err := r.pool.Query(ctx, query, tradeID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения истории хеджирования: %w", err)
+	}
+	defer rows.Close()
+
+	var hedgeHistory []*entities.HedgedTrade
+	for rows.Next() {
+		trade := &entities.HedgedTrade{}
+		var orderStatusStr string
+
+		err := rows.Scan(
+			&trade.FreqtradeTradeID,
+			&trade.Pair,
+			&trade.BybitOrderID,
+			&trade.HedgeTime,
+			&trade.FreqtradeOpenPrice,
+			&trade.FreqtradeAmount,
+			&trade.FreqtradeProfitRatio,
+			&trade.HedgeOpenPrice,
+			&trade.HedgeAmount,
+			&trade.HedgeTakeProfitPrice,
+			&orderStatusStr,
+			&trade.LastStatusCheck,
+			&trade.ClosePrice,
+			&trade.CloseTime)
+
+		if err != nil {
+			return nil, fmt.Errorf("ошибка сканирования истории хеджирования: %w", err)
+		}
+
+		trade.OrderStatus = entities.OrderStatusFromString(orderStatusStr)
+		hedgeHistory = append(hedgeHistory, trade)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка итерации по результатам: %w", err)
+	}
+
+	return hedgeHistory, nil
 }

@@ -40,3 +40,8 @@ func (r *HedgeRepositoryAdapter) GetHedgedTrades(ctx context.Context, status *st
 func (r *HedgeRepositoryAdapter) UpdateHedgedTradeStatus(ctx context.Context, orderID string, status entities.OrderStatus, closePrice *float64, closeTime *time.Time) error {
 	return r.dbRepo.UpdateHedgedTradeStatus(ctx, orderID, status, closePrice, closeTime)
 }
+
+// GetHedgeHistory получает историю хедж-ордеров по конкретной сделке
+func (r *HedgeRepositoryAdapter) GetHedgeHistory(ctx context.Context, tradeID int) ([]*entities.HedgedTrade, error) {
+	return r.dbRepo.GetHedgeHistory(ctx, tradeID)
+}

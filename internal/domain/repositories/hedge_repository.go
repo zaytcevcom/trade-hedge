@@ -21,4 +21,7 @@ type HedgeRepository interface {
 
 	// UpdateHedgedTradeStatus обновляет статус хеджированной сделки
 	UpdateHedgedTradeStatus(ctx context.Context, orderID string, status entities.OrderStatus, closePrice *float64, closeTime *time.Time) error
+
+	// GetHedgeHistory получает историю хедж-ордеров по конкретной сделке
+	GetHedgeHistory(ctx context.Context, tradeID int) ([]*entities.HedgedTrade, error)
 }

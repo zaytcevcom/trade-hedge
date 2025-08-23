@@ -16,7 +16,6 @@ import (
 	"trade-hedge/internal/domain/entities"
 	"trade-hedge/internal/domain/services"
 	"trade-hedge/internal/infrastructure/config"
-	"trade-hedge/internal/pkg/logger"
 )
 
 // BybitClient клиент для работы с Bybit API
@@ -261,10 +260,6 @@ func (b *BybitClient) GetBalance(ctx context.Context, asset string) (*entities.B
 					availableBalance = walletBalance
 				}
 
-				// Логируем баланс с временной меткой
-				logger.LogWithTime("🔍 Bybit Balance API: %s - доступно %.4f, общий %.4f",
-					asset, availableBalance, walletBalance)
-
 				return &entities.Balance{
 					Asset:     asset,
 					Available: availableBalance, // Доступный для вывода/торговли
@@ -300,8 +295,6 @@ func (b *BybitClient) GetInstrumentInfo(ctx context.Context, symbol string) (*se
 		return nil, fmt.Errorf("ошибка чтения ответа: %w", err)
 	}
 
-	// Логируем ответ для отладки
-	logger.LogWithTime("🔍 Bybit Instrument Info API: %s - получено %d байт", symbol, len(body))
 	// Ответ получен успешно
 
 	// Проверка на ошибку

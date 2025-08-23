@@ -13,11 +13,12 @@ import (
 
 // TradeStats статистика по сделкам
 type TradeStats struct {
-	Total          int     `json:"total"`
-	Active         int     `json:"active"`
-	Completed      int     `json:"completed"`
-	TotalProfit    float64 `json:"totalProfit"`
-	TotalOrderSize float64 `json:"totalOrderSize"` // Общий размер всех ордеров в долларах
+	Total            int     `json:"total"`
+	Active           int     `json:"active"`
+	Completed        int     `json:"completed"`
+	TotalProfit      float64 `json:"totalProfit"`
+	TotalOrderSize   float64 `json:"totalOrderSize"`   // Общий размер всех ордеров в долларах
+	AverageOrderSize float64 `json:"averageOrderSize"` // Средний размер позиции в долларах
 }
 
 // APIResponse универсальный ответ API
@@ -331,6 +332,11 @@ func (s *Server) calculateStats(trades []*entities.HedgedTrade) TradeStats {
 				stats.TotalProfit += *profit
 			}
 		}
+	}
+
+	// Рассчитываем средний размер позиции
+	if stats.Total > 0 {
+		stats.AverageOrderSize = stats.TotalOrderSize / float64(stats.Total)
 	}
 
 	return stats
